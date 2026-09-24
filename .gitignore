@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Virtual environment
+.venv/
+venv/
+
+# macOS
+.DS_Store
+
+# Environment variables
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# Generated outputs
+outputs/results/*
+outputs/figures/*
+
+# Raw downloaded datasets
+data/raw/*

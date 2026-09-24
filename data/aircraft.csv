@@ -1,0 +1,2 @@
+aircraft_type,seats,max_range_km,planning_range_km,turnaround_minutes,usable_hours_per_day,fleet_size
+A320neo,180,6400,6000,45,11,5
