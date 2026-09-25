@@ -67,7 +67,12 @@ def calculate_route_economics(route, frequency, seats,):
     contribution = (revenue - total_cost)
 
     # Calculate Aircraft Hours
-    aircraft_hours = (frequency * route["round_trip_block_hours"])  
+    aircraft_hours = (frequency * route["round_trip_block_hours"])
+    
+    contribution_per_aircraft_hour = (
+    contribution / aircraft_hours
+    if aircraft_hours > 0
+    else 0)
 
     # Return Results
     return {
@@ -89,6 +94,10 @@ def calculate_route_economics(route, frequency, seats,):
         ),
         "aircraft_hours": round(
             aircraft_hours,
+            2,
+        ),    
+        "contribution_per_aircraft_hour": round(
+            contribution_per_aircraft_hour,
             2,
         ),
     }
