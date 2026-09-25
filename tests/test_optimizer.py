@@ -1,5 +1,8 @@
+import pandas as pd
 from src.optimizer import run_toy_optimizer
 from src.optimizer import optimize_network
+from src.optimizer import optimize_network
+
 
 
 def test_toy_optimizer_respects_capacity():
@@ -26,7 +29,10 @@ def test_optimizer_selects_one_option_per_route():
 
     result = optimize_network()
 
-    routes = result["routes"]
+    source_routes = pd.read_csv(
+        "data/routes.csv"
+    )
 
-    assert len(routes) == 10
+    selected_routes = result["routes"]
 
+    assert len(selected_routes) == len(source_routes)

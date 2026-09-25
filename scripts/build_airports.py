@@ -2,23 +2,19 @@ import pandas as pd
 
 RAW_AIRPORTS_PATH = "data/raw/airports.csv"
 OUTPUT_PATH = "data/airports.csv"
-
-AIRPORT_CODES = [
-    "BRU",
-    "LHR",
-    "BCN",
-    "MAD",
-    "LIS",
-    "FCO",
-    "CPH",
-    "ARN",
-    "PRG",
-    "ATH",
-    "AGP",
-]
+MARKET_ASSUMPTIONS_PATH = "data/market_assumptions.csv"
 
 #Read raw airports file
 airports = pd.read_csv(RAW_AIRPORTS_PATH)
+
+market_assumptions = pd.read_csv(
+    MARKET_ASSUMPTIONS_PATH
+)
+
+AIRPORT_CODES = [
+    "BRU",
+    *market_assumptions["destination"].tolist(),
+]
 
 # Filtering selected airports
 selected_airports = airports[
@@ -47,6 +43,7 @@ selected_airports = selected_airports.rename(
         "longitude_deg": "longitude",
     }
 )
+
 
 selected_airports["iata"] = pd.Categorical(
     selected_airports["iata"],

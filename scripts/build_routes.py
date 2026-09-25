@@ -5,22 +5,19 @@ import pandas as pd
 AIRPORTS_PATH = "data/airports.csv"
 AIRCRAFT_PATH = "data/aircraft.csv"
 OUTPUT_PATH = "data/routes.csv"
+MARKET_ASSUMPTIONS_PATH = "data/market_assumptions.csv"
 
 # Defining hubs + destination airports
 HUB = "BRU"
 
-DESTINATIONS = [
-    "LHR",
-    "BCN",
-    "MAD",
-    "LIS",
-    "FCO",
-    "CPH",
-    "ARN",
-    "PRG",
-    "ATH",
-    "AGP",
-]
+market_assumptions = pd.read_csv(
+    MARKET_ASSUMPTIONS_PATH
+)
+
+DESTINATIONS = (
+    market_assumptions["destination"]
+    .tolist()
+)
 
 # Allowed Frequencies
 FREQUENCY_OPTIONS = [0, 3, 4, 7, 10, 14]
