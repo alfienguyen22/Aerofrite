@@ -4,7 +4,8 @@ from ortools.sat.python import cp_model
 
 from src.economics import calculate_route_economics
 
-# File path
+
+# File paths
 ROUTES_PATH = "data/routes.csv"
 AIRCRAFT_PATH = "data/aircraft.csv"
 OUTPUT_PATH = "outputs/results/optimized_network.csv"
@@ -33,7 +34,6 @@ def run_toy_optimizer():
                 "aircraft_hours": 40,
             },
         },
-
         "MAD": {
             0: {
                 "contribution": 0,
@@ -48,7 +48,6 @@ def run_toy_optimizer():
                 "aircraft_hours": 44,
             },
         },
-
         "LIS": {
             0: {
                 "contribution": 0,
@@ -69,10 +68,9 @@ def run_toy_optimizer():
 
     model = cp_model.CpModel()
 
-    # Creating decision variable
+    # Create decision variables
     decision_vars = {}
 
-    # Creating binary variables for each combination
     for route, options in routes.items():
 
         for frequency in options:
@@ -83,8 +81,7 @@ def run_toy_optimizer():
                 f"{route}_{frequency}"
             )
 
-
-    # Only one frequency per route
+    # Exactly one frequency per route
     for route, options in routes.items():
 
         model.Add(
@@ -97,13 +94,12 @@ def run_toy_optimizer():
             == 1
         )
 
-
-    # Converting aircraft hours into minutes
-    available_aircraft_minutes = (
+    # Convert aircraft hours to minutes
+    available_aircraft_minutes = round(
         available_aircraft_hours * 60
     )
 
-    # Adding aircraft hours constraint
+    # Aircraft capacity constraint
     total_aircraft_minutes = []
 
     for route, options in routes.items():
@@ -126,7 +122,7 @@ def run_toy_optimizer():
         <= available_aircraft_minutes
     )
 
-    # Defining objective
+    # Objective: maximize contribution
     total_contribution = []
 
     for route, options in routes.items():
@@ -159,7 +155,6 @@ def run_toy_optimizer():
         raise RuntimeError(
             "Optimizer could not find a feasible solution."
         )
-
 
     results = []
 
@@ -225,8 +220,12 @@ def run_toy_optimizer():
 
     return results
 
-# Actual Optimizer Function
-def optimize_network():
+
+def optimize_network(
+    fleet_size_override=None,
+    save_output=True,
+    print_results=True,
+):
     """
     Optimize Aerofrite's weekly route network.
 
@@ -234,21 +233,47 @@ def optimize_network():
     allowed weekly frequency while respecting total
     fleet aircraft-hour capacity.
 
-    Objective:
-        Maximize total weekly network contribution.
+    Parameters
+    ----------
+    fleet_size_override : int or None
+        Optional fleet size to use instead of the value
+        stored in aircraft.csv.
+
+        If None, the normal aircraft.csv fleet size is used.
+
+        This is useful for stress testing and scenario analysis.
+
+    save_output : bool
+        Whether to save the active network to
+        outputs/results/optimized_network.csv.
+
+    print_results : bool
+        Whether to print the network summary to the terminal.
+
+    Objective
+    ---------
+    Maximize total weekly network contribution.
     """
 
-    routes = pd.read_csv(ROUTES_PATH)
-    aircraft = pd.read_csv(AIRCRAFT_PATH)
+    routes = pd.read_csv(
+        ROUTES_PATH
+    )
 
-    # Load Fleet Assumptions
+    aircraft = pd.read_csv(
+        AIRCRAFT_PATH
+    )
+
+    # --------------------------------------------------
+    # Load fleet assumptions
+    # --------------------------------------------------
+
     aircraft_row = aircraft.iloc[0]
 
     seats = int(
         aircraft_row["seats"]
     )
 
-    fleet_size = int(
+    default_fleet_size = int(
         aircraft_row["fleet_size"]
     )
 
@@ -256,20 +281,51 @@ def optimize_network():
         aircraft_row["usable_hours_per_day"]
     )
 
-    # Calculate Weekly Capacity
+    # Use normal fleet size unless an override
+    # has been provided.
+    if fleet_size_override is None:
+
+        fleet_size = default_fleet_size
+
+    else:
+
+        if (
+            not isinstance(
+                fleet_size_override,
+                int,
+            )
+            or fleet_size_override < 0
+        ):
+            raise ValueError(
+                "fleet_size_override must be "
+                "a non-negative integer."
+            )
+
+        fleet_size = fleet_size_override
+
+    # --------------------------------------------------
+    # Calculate weekly fleet capacity
+    # --------------------------------------------------
+
     available_aircraft_hours = (
         fleet_size
         * usable_hours_per_day
         * 7
     )
 
-    # Convert to minute
+    # CP-SAT requires integer coefficients,
+    # so aircraft time is represented in minutes.
     available_aircraft_minutes = round(
-        available_aircraft_hours * 60
+        available_aircraft_hours
+        * 60
     )
 
-    # Build route and frequency combinations
+    # --------------------------------------------------
+    # Build route-frequency economics
+    # --------------------------------------------------
+
     route_options = {}
+
     for _, route in routes.iterrows():
 
         route_id = route["route_id"]
@@ -281,19 +337,27 @@ def optimize_network():
             ).split("|")
         ]
 
-        route_options[route_id] = {}
+        route_options[
+            route_id
+        ] = {}
 
         for frequency in frequencies:
 
-            economics = calculate_route_economics(
-                route=route,
-                frequency=frequency,
-                seats=seats,
+            economics = (
+                calculate_route_economics(
+                    route=route,
+                    frequency=frequency,
+                    seats=seats,
+                )
             )
 
             route_options[
                 route_id
             ][frequency] = economics
+
+    # --------------------------------------------------
+    # Create optimization model
+    # --------------------------------------------------
 
     model = cp_model.CpModel()
 
@@ -309,7 +373,11 @@ def optimize_network():
                 f"{route_id}_{frequency}"
             )
 
-    # One frequency per route
+    # --------------------------------------------------
+    # Constraint:
+    # exactly one frequency per route
+    # --------------------------------------------------
+
     for route_id, options in route_options.items():
 
         model.Add(
@@ -322,7 +390,11 @@ def optimize_network():
             == 1
         )
 
-    # Fleet constraint
+    # --------------------------------------------------
+    # Constraint:
+    # total aircraft time cannot exceed fleet capacity
+    # --------------------------------------------------
+
     aircraft_minute_terms = []
 
     for route_id, options in route_options.items():
@@ -346,6 +418,11 @@ def optimize_network():
         <= available_aircraft_minutes
     )
 
+    # --------------------------------------------------
+    # Objective:
+    # maximize total network contribution
+    # --------------------------------------------------
+
     contribution_terms = []
 
     for route_id, options in route_options.items():
@@ -367,9 +444,15 @@ def optimize_network():
         sum(contribution_terms)
     )
 
+    # --------------------------------------------------
+    # Solve
+    # --------------------------------------------------
+
     solver = cp_model.CpSolver()
 
-    status = solver.Solve(model)
+    status = solver.Solve(
+        model
+    )
 
     if status not in (
         cp_model.OPTIMAL,
@@ -379,6 +462,9 @@ def optimize_network():
             "No feasible Aerofrite network found."
         )
 
+    # --------------------------------------------------
+    # Extract selected route-frequency choices
+    # --------------------------------------------------
 
     selected_routes = []
     selected_aircraft_minutes = 0
@@ -406,10 +492,13 @@ def optimize_network():
                     aircraft_minutes
                 )
 
-
     results = pd.DataFrame(
         selected_routes
     )
+
+    # --------------------------------------------------
+    # Network totals
+    # --------------------------------------------------
 
     total_contribution = (
         results["contribution"].sum()
@@ -427,105 +516,143 @@ def optimize_network():
         results["passengers"].sum()
     )
 
+    # Use the exact same minute accounting
+    # used by the optimizer constraint.
     total_aircraft_hours = (
-        selected_aircraft_minutes / 60
+        selected_aircraft_minutes
+        / 60
     )
 
-    fleet_utilization = (
-        total_aircraft_hours
-        / available_aircraft_hours
-    )
+    if available_aircraft_hours > 0:
+
+        fleet_utilization = (
+            total_aircraft_hours
+            / available_aircraft_hours
+        )
+
+    else:
+
+        fleet_utilization = 0.0
 
     active_routes = results[
         results["frequency"] > 0
-    ]
+    ].copy()
 
     destinations_served = len(
         active_routes
     )
 
-    active_routes.to_csv(
-        OUTPUT_PATH,
-        index=False,
-    )
+    # --------------------------------------------------
+    # Save results
+    # --------------------------------------------------
 
-    print("\n")
-    print("=" * 70)
-    print("AEROFRITE — OPTIMAL WEEKLY NETWORK")
-    print("=" * 70)
+    if save_output:
 
-    for _, result in results.iterrows():
-
-        route_id = result["route_id"]
-        frequency = int(
-            result["frequency"]
+        active_routes.to_csv(
+            OUTPUT_PATH,
+            index=False,
         )
 
-        if frequency == 0:
+    # --------------------------------------------------
+    # Print results
+    # --------------------------------------------------
 
-            print(
-                f"{route_id:8} | "
-                f"CLOSED"
+    if print_results:
+
+        print("\n")
+
+        print("=" * 70)
+
+        print(
+            "AEROFRITE — OPTIMAL WEEKLY NETWORK"
+        )
+
+        print("=" * 70)
+
+        print(
+            f"Fleet size: {fleet_size} aircraft"
+        )
+
+        print("-" * 70)
+
+        for _, result in results.iterrows():
+
+            route_id = result["route_id"]
+
+            frequency = int(
+                result["frequency"]
             )
 
-        else:
+            if frequency == 0:
 
-            print(
-                f"{route_id:8} | "
-                f"{frequency:2}x/week | "
-                f"Passengers: "
-                f"{int(result['passengers']):5} | "
-                f"LF: "
-                f"{result['load_factor']:.1%} | "
-                f"Contribution: "
-                f"€{result['contribution']:,.0f} | "
-                f"Hours: "
-                f"{result['aircraft_hours']:.1f}"
-            )
+                print(
+                    f"{route_id:8} | "
+                    f"CLOSED"
+                )
 
-    print("-" * 70)
+            else:
 
-    print(
-        f"Destinations served: "
-        f"{destinations_served}"
-    )
+                print(
+                    f"{route_id:8} | "
+                    f"{frequency:2}x/week | "
+                    f"Passengers: "
+                    f"{int(result['passengers']):5} | "
+                    f"LF: "
+                    f"{result['load_factor']:.1%} | "
+                    f"Contribution: "
+                    f"€{result['contribution']:,.0f} | "
+                    f"Hours: "
+                    f"{result['aircraft_hours']:.1f}"
+                )
 
-    print(
-        f"Weekly passengers: "
-        f"{int(total_passengers):,}"
-    )
+        print("-" * 70)
 
-    print(
-        f"Weekly revenue: "
-        f"€{total_revenue:,.0f}"
-    )
+        print(
+            f"Destinations served: "
+            f"{destinations_served}"
+        )
 
-    print(
-        f"Weekly cost: "
-        f"€{total_cost:,.0f}"
-    )
+        print(
+            f"Weekly passengers: "
+            f"{int(total_passengers):,}"
+        )
 
-    print(
-        f"Weekly contribution: "
-        f"€{total_contribution:,.0f}"
-    )
+        print(
+            f"Weekly revenue: "
+            f"€{total_revenue:,.0f}"
+        )
 
-    print(
-        f"Aircraft hours: "
-        f"{total_aircraft_hours:.1f} "
-        f"/ {available_aircraft_hours:.1f}"
-    )
+        print(
+            f"Weekly cost: "
+            f"€{total_cost:,.0f}"
+        )
 
-    print(
-        f"Fleet utilization: "
-        f"{fleet_utilization:.1%}"
-    )
+        print(
+            f"Weekly contribution: "
+            f"€{total_contribution:,.0f}"
+        )
 
-    print("=" * 70)
+        print(
+            f"Aircraft hours: "
+            f"{total_aircraft_hours:.1f} "
+            f"/ {available_aircraft_hours:.1f}"
+        )
+
+        print(
+            f"Fleet utilization: "
+            f"{fleet_utilization:.1%}"
+        )
+
+        print("=" * 70)
+
+    # --------------------------------------------------
+    # Return results
+    # --------------------------------------------------
 
     return {
         "routes": results,
         "active_routes": active_routes,
+        "fleet_size": fleet_size,
         "total_contribution": total_contribution,
         "total_revenue": total_revenue,
         "total_cost": total_cost,
@@ -535,6 +662,7 @@ def optimize_network():
         "fleet_utilization": fleet_utilization,
         "destinations_served": destinations_served,
     }
+
 
 if __name__ == "__main__":
     optimize_network()
