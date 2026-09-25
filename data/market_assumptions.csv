@@ -1,0 +1,11 @@
+destination,market_type,base_weekly_demand,fare_multiplier,airport_cost_tier,weekly_fixed_route_cost
+LHR,business,2400,1.25,high,12000
+BCN,mixed,2200,1.00,medium,8000
+MAD,mixed,1800,1.05,medium,8000
+LIS,mixed,1500,1.10,medium,7000
+FCO,mixed,2000,1.05,medium,8000
+CPH,business,1300,1.20,high,9000
+ARN,mixed,1100,1.15,medium,7000
+PRG,mixed,1200,0.95,medium,6000
+ATH,leisure,1500,1.00,medium,7000
+AGP,leisure,1800,0.90,low,5000
