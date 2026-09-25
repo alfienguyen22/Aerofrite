@@ -1,0 +1,11 @@
+route_id,origin,destination,distance_km,one_way_block_hours,round_trip_block_hours,aircraft_type,range_feasible,frequency_options
+BRU-LHR,BRU,LHR,350,1.02,3.54,A320neo,True,0|3|4|7|10|14
+BRU-BCN,BRU,BCN,1084,2.0,5.5,A320neo,True,0|3|4|7|10|14
+BRU-MAD,BRU,MAD,1314,2.3,6.1,A320neo,True,0|3|4|7|10|14
+BRU-LIS,BRU,LIS,1717,2.84,7.18,A320neo,True,0|3|4|7|10|14
+BRU-FCO,BRU,FCO,1173,2.11,5.72,A320neo,True,0|3|4|7|10|14
+BRU-CPH,BRU,CPH,754,1.56,4.62,A320neo,True,0|3|4|7|10|14
+BRU-ARN,BRU,ARN,1288,2.27,6.04,A320neo,True,0|3|4|7|10|14
+BRU-PRG,BRU,PRG,697,1.48,4.46,A320neo,True,0|3|4|7|10|14
+BRU-ATH,BRU,ATH,2101,3.35,8.2,A320neo,True,0|3|4|7|10|14
+BRU-AGP,BRU,AGP,1735,2.86,7.22,A320neo,True,0|3|4|7|10|14
