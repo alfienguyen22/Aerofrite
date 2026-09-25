@@ -381,6 +381,7 @@ def optimize_network():
 
 
     selected_routes = []
+    selected_aircraft_minutes = 0
 
     for route_id, options in route_options.items():
 
@@ -394,6 +395,15 @@ def optimize_network():
 
                 selected_routes.append(
                     economics
+                )
+
+                aircraft_minutes = round(
+                    economics["aircraft_hours"]
+                    * 60
+                )
+
+                selected_aircraft_minutes += (
+                    aircraft_minutes
                 )
 
 
@@ -418,7 +428,7 @@ def optimize_network():
     )
 
     total_aircraft_hours = (
-        results["aircraft_hours"].sum()
+        selected_aircraft_minutes / 60
     )
 
     fleet_utilization = (
