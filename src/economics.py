@@ -4,6 +4,16 @@ import pandas as pd
 ROUTES_PATH = "data/routes.csv"
 AIRCRAFT_PATH = "data/aircraft.csv"
 
+# Adding Frequency Sensitivity
+FREQUENCY_DEMAND_MULTIPLIERS = {
+    0: 0.00,
+    3: 0.55,
+    4: 0.65,
+    7: 1.00,
+    10: 1.08,
+    14: 1.15,
+}
+
 # Economics Function
 def calculate_route_economics(route, frequency, seats,):
     """
@@ -35,6 +45,8 @@ def calculate_route_economics(route, frequency, seats,):
             "weekly_seats": 0,
             "passengers": 0,
             "load_factor": 0.0,
+            "demand_multiplier": 0.0,
+            "effective_demand": 0,
             "revenue": 0.0,
             "variable_cost": 0.0,
             "fixed_route_cost": 0.0,
@@ -43,11 +55,31 @@ def calculate_route_economics(route, frequency, seats,):
             "aircraft_hours": 0.0,
         }
 
+    if frequency not in FREQUENCY_DEMAND_MULTIPLIERS:
+        raise ValueError(
+            f"No demand multiplier defined "
+            f"for frequency {frequency}"
+        )
+
+    demand_multiplier = (
+        FREQUENCY_DEMAND_MULTIPLIERS[
+            frequency
+        ]
+    )
+
+    effective_demand = round(
+        route["weekly_demand"]
+        * demand_multiplier
+    )
+
     # Calculating Weekly Seats based on Rotation
     weekly_seats = (frequency * seats * 2)
 
     # Calculating Passengers based on the lower value
-    passengers = min(route["weekly_demand"], weekly_seats,)
+    passengers = min(
+        effective_demand,
+        weekly_seats,
+    )
 
     load_factor = (passengers / weekly_seats)
 
@@ -80,6 +112,13 @@ def calculate_route_economics(route, frequency, seats,):
         "frequency": frequency,
         "weekly_seats": int(weekly_seats),
         "passengers": int(passengers),
+        "demand_multiplier": round(
+                    demand_multiplier,
+                    2,
+                ),
+        "effective_demand": int(
+                    effective_demand
+                ),
         "load_factor": round(load_factor, 4),
         "revenue": round(revenue, 2),
         "variable_cost": round(variable_cost, 2),

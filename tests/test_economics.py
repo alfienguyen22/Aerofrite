@@ -51,3 +51,36 @@ def test_closed_route_has_zero_economics():
     assert result["fixed_route_cost"] == 0
     assert result["contribution"] == 0
     assert result["aircraft_hours"] == 0
+
+def test_lower_frequency_reduces_effective_demand():
+
+    route = pd.Series(
+        {
+            "route_id": "TEST",
+            "weekly_demand": 1000,
+            "average_fare": 100,
+            "variable_cost_per_rotation": 5000,
+            "weekly_fixed_route_cost": 5000,
+            "round_trip_block_hours": 5,
+        }
+    )
+
+    three_weekly = calculate_route_economics(
+        route=route,
+        frequency=3,
+        seats=180,
+    )
+
+    daily = calculate_route_economics(
+        route=route,
+        frequency=7,
+        seats=180,
+    )
+
+    assert three_weekly["effective_demand"] == 550
+    assert daily["effective_demand"] == 1000
+
+    assert (
+        three_weekly["passengers"]
+        < daily["passengers"]
+    )
