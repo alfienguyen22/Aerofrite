@@ -1,9 +1,9 @@
 import pandas as pd
 import streamlit as st
-
 from src.scenarios import (
     compare_fleet_scenarios,
     compare_networks,
+    compare_season_scenarios,
 )
 from src.economics import calculate_route_economics
 from src.optimizer import optimize_network
@@ -197,6 +197,7 @@ for _, route in route_reference.iterrows():
             route=route,
             frequency=frequency,
             seats=seats,
+            season=season,
         )
 
         route_options.append(
@@ -546,7 +547,8 @@ else:
 
     st.caption(
         "Effective demand reflects Aerofrite's modeled "
-        "frequency-sensitive market capture."
+        "seasonality, competition, and frequency-sensitive "
+        "market adjustments."
     )
 
 # --------------------------------------------------
@@ -1127,6 +1129,234 @@ else:
                 ),
         },
     )
+
+# --------------------------------------------------
+# Seasonal network comparison
+# --------------------------------------------------
+
+st.subheader("Seasonal Network Comparison")
+
+st.write(
+    """
+    Compare how Aerofrite's optimized network changes
+    across winter, shoulder season, and summer while
+    holding fleet size constant.
+    """
+)
+
+season_summary, season_results = (
+    compare_season_scenarios(
+        fleet_size=fleet_size
+    )
+)
+
+
+# --------------------------------------------------
+# Seasonal summary
+# --------------------------------------------------
+
+st.dataframe(
+    season_summary,
+    use_container_width=True,
+    hide_index=True,
+    column_config={
+        "Season":
+            st.column_config.TextColumn(
+                "Season",
+            ),
+        "Destinations":
+            st.column_config.NumberColumn(
+                format="%d",
+            ),
+        "Passengers":
+            st.column_config.NumberColumn(
+                format="%d",
+            ),
+        "Revenue (€)":
+            st.column_config.NumberColumn(
+                format="localized",
+            ),
+        "Cost (€)":
+            st.column_config.NumberColumn(
+                format="localized",
+            ),
+        "Contribution (€)":
+            st.column_config.NumberColumn(
+                format="localized",
+            ),
+        "Aircraft Hours":
+            st.column_config.NumberColumn(
+                format="%.1f",
+            ),
+        "Available Hours":
+            st.column_config.NumberColumn(
+                format="%.1f",
+            ),
+        "Utilization":
+            st.column_config.NumberColumn(
+                format="%.1f%%",
+            ),
+    },
+)
+
+st.markdown(
+    "**Compare Two Seasons**"
+)
+
+season_compare_col1, season_compare_col2 = (
+    st.columns(2)
+)
+
+with season_compare_col1:
+
+    baseline_season = st.selectbox(
+        "Baseline season",
+        options=[
+            "winter",
+            "shoulder",
+            "summer",
+        ],
+        index=0,
+        format_func=lambda value:
+            value.title(),
+        key="baseline_season",
+    )
+
+with season_compare_col2:
+
+    alternative_season = st.selectbox(
+        "Alternative season",
+        options=[
+            "winter",
+            "shoulder",
+            "summer",
+        ],
+        index=2,
+        format_func=lambda value:
+            value.title(),
+        key="alternative_season",
+    )
+
+baseline_result = season_results[
+    baseline_season
+]
+
+alternative_result = season_results[
+    alternative_season
+]
+
+season_contribution_change = (
+    alternative_result[
+        "total_contribution"
+    ]
+    - baseline_result[
+        "total_contribution"
+    ]
+)
+
+season_passenger_change = (
+    alternative_result[
+        "total_passengers"
+    ]
+    - baseline_result[
+        "total_passengers"
+    ]
+)
+
+season_destination_change = (
+    alternative_result[
+        "destinations_served"
+    ]
+    - baseline_result[
+        "destinations_served"
+    ]
+)
+
+
+st.markdown(
+    f"**Modeled Impact: "
+    f"{baseline_season.title()} → "
+    f"{alternative_season.title()}**"
+)
+
+season_metric1, season_metric2, (
+    season_metric3
+) = st.columns(3)
+
+season_metric1.metric(
+    "Contribution Change",
+    (
+        f"€{season_contribution_change:,.0f}"
+        if season_contribution_change >= 0
+        else (
+            f"-€"
+            f"{abs(season_contribution_change):,.0f}"
+        )
+    ),
+)
+
+season_metric2.metric(
+    "Passenger Change",
+    f"{season_passenger_change:+,.0f}",
+)
+
+season_metric3.metric(
+    "Destination Change",
+    f"{season_destination_change:+,.0f}",
+)
+
+season_network_changes = (
+    compare_networks(
+        baseline_result,
+        alternative_result,
+    )
+)
+
+st.markdown(
+    "**Seasonal Network Changes**"
+)
+
+if season_network_changes.empty:
+
+    st.info(
+        "The selected seasons produce "
+        "the same route frequencies."
+    )
+
+else:
+
+    st.dataframe(
+        season_network_changes,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Route":
+                st.column_config.TextColumn(
+                    "Route",
+                ),
+            "Frequency A":
+                st.column_config.NumberColumn(
+                    baseline_season.title(),
+                    format="%d",
+                ),
+            "Frequency B":
+                st.column_config.NumberColumn(
+                    alternative_season.title(),
+                    format="%d",
+                ),
+            "Frequency Change":
+                st.column_config.NumberColumn(
+                    "Change",
+                    format="%+d",
+                ),
+            "Change Type":
+                st.column_config.TextColumn(
+                    "Change Type",
+                ),
+        },
+    )
+
+
 # --------------------------------------------------
 # Demand model explorer
 # --------------------------------------------------

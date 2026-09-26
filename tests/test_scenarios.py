@@ -1,6 +1,7 @@
 from src.scenarios import (
     compare_fleet_scenarios,
     compare_networks,
+    compare_season_scenarios,
 )
 
 
@@ -157,3 +158,44 @@ def test_incremental_metrics_are_calculated():
         ]
         > 0
     )
+
+def test_season_scenarios_include_all_seasons():
+
+    summary, results = (
+        compare_season_scenarios(
+            fleet_size=5,
+        )
+    )
+
+    assert summary[
+        "Season"
+    ].tolist() == [
+        "Winter",
+        "Shoulder",
+        "Summer",
+    ]
+
+    assert set(
+        results.keys()
+    ) == {
+        "winter",
+        "shoulder",
+        "summer",
+    }
+
+
+def test_season_scenarios_respect_capacity():
+
+    summary, _ = (
+        compare_season_scenarios(
+            fleet_size=5,
+        )
+    )
+
+    for _, row in summary.iterrows():
+
+        assert (
+            row["Aircraft Hours"]
+            <= row["Available Hours"]
+            + 0.01
+        )
