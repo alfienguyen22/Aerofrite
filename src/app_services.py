@@ -1,6 +1,7 @@
 import pandas as pd
 import streamlit as st
 
+from src.economics import calculate_route_economics
 from src.optimizer import optimize_network
 
 
@@ -142,3 +143,292 @@ def build_route_details(
         )
 
     return routes
+
+# --------------------------------------------------
+# Route frequency analysis
+# --------------------------------------------------
+
+@st.cache_data(
+    show_spinner=False
+)
+def get_route_frequency_analysis(
+    route_id,
+    season,
+):
+    """
+    Evaluate every allowed frequency for one
+    candidate route.
+
+    This is a standalone route analysis and does
+    not account for network opportunity cost.
+    """
+
+    reference = load_reference_data()
+
+    route_reference = reference[
+        "routes"
+    ]
+
+    aircraft_reference = reference[
+        "aircraft"
+    ]
+
+    route_match = route_reference[
+        route_reference["route_id"]
+        == route_id
+    ]
+
+    if route_match.empty:
+
+        raise ValueError(
+            f"Unknown route: {route_id}"
+        )
+
+    route = route_match.iloc[0]
+
+    seats = int(
+        aircraft_reference.iloc[0][
+            "seats"
+        ]
+    )
+
+    frequencies = [
+        int(value)
+        for value in str(
+            route[
+                "frequency_options"
+            ]
+        ).split("|")
+    ]
+
+    rows = []
+
+    for frequency in frequencies:
+
+        economics = (
+            calculate_route_economics(
+                route=route,
+                frequency=frequency,
+                seats=seats,
+                season=season,
+            )
+        )
+
+        rows.append(
+            economics
+        )
+
+    return pd.DataFrame(
+        rows
+    )
+
+
+# --------------------------------------------------
+# Closed-route analysis
+# --------------------------------------------------
+
+@st.cache_data(
+    show_spinner=False
+)
+def get_closed_route_analysis(
+    fleet_size,
+    season,
+    operational_buffer,
+):
+    """
+    Analyze candidate routes that are closed in
+    the current optimized network.
+    """
+
+    result = get_optimized_network(
+        fleet_size=fleet_size,
+        season=season,
+        operational_buffer=(
+            operational_buffer
+        ),
+    )
+
+    reference = load_reference_data()
+
+    route_reference = reference[
+        "routes"
+    ]
+
+    airport_reference = reference[
+        "airports"
+    ]
+
+    aircraft_reference = reference[
+        "aircraft"
+    ]
+
+    seats = int(
+        aircraft_reference.iloc[0][
+            "seats"
+        ]
+    )
+
+    closed_route_ids = set(
+        result[
+            "routes"
+        ][
+            result[
+                "routes"
+            ]["frequency"] == 0
+        ][
+            "route_id"
+        ]
+    )
+
+    rows = []
+
+    for _, route in (
+        route_reference.iterrows()
+    ):
+
+        route_id = route[
+            "route_id"
+        ]
+
+        if (
+            route_id
+            not in closed_route_ids
+        ):
+            continue
+
+        frequencies = [
+            int(value)
+            for value in str(
+                route[
+                    "frequency_options"
+                ]
+            ).split("|")
+            if int(value) > 0
+        ]
+
+        route_options = []
+
+        for frequency in frequencies:
+
+            economics = (
+                calculate_route_economics(
+                    route=route,
+                    frequency=frequency,
+                    seats=seats,
+                    season=season,
+                )
+            )
+
+            route_options.append(
+                economics
+            )
+
+        best_option = max(
+            route_options,
+            key=lambda option:
+                option[
+                    "contribution"
+                ],
+        )
+
+        destination = route[
+            "destination"
+        ]
+
+        airport_match = (
+            airport_reference[
+                airport_reference[
+                    "iata"
+                ]
+                == destination
+            ]
+        )
+
+        if airport_match.empty:
+
+            city = destination
+
+        else:
+
+            city = (
+                airport_match.iloc[0][
+                    "city"
+                ]
+            )
+
+        if fleet_size == 0:
+
+            reason = (
+                "No fleet capacity"
+            )
+
+        elif (
+            best_option[
+                "contribution"
+            ]
+            <= 0
+        ):
+
+            reason = (
+                "Non-positive modeled "
+                "contribution at all tested "
+                "frequencies"
+            )
+
+        else:
+
+            reason = (
+                "Positive standalone "
+                "contribution, but not selected "
+                "in optimal fleet allocation"
+            )
+
+        rows.append(
+            {
+                "Route":
+                    route_id,
+
+                "Destination":
+                    city,
+
+                "Market Type":
+                    route[
+                        "market_type"
+                    ].title(),
+
+                "Best Frequency":
+                    best_option[
+                        "frequency"
+                    ],
+
+                "Best Contribution (€)":
+                    best_option[
+                        "contribution"
+                    ],
+
+                "Contribution / Hour (€)":
+                    best_option[
+                        "contribution_per_aircraft_hour"
+                    ],
+
+                "Aircraft Hours Required":
+                    best_option[
+                        "aircraft_hours"
+                    ],
+
+                "Load Factor":
+                    (
+                        best_option[
+                            "load_factor"
+                        ]
+                        * 100
+                    ),
+
+                "Reason":
+                    reason,
+            }
+        )
+
+    return pd.DataFrame(
+        rows
+    )
