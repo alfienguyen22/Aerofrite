@@ -224,6 +224,7 @@ def run_toy_optimizer():
 def optimize_network(
     fleet_size_override=None,
     season="shoulder",
+    operational_buffer=0.0,
     save_output=True,
     print_results=True,
 ):
@@ -276,6 +277,19 @@ def optimize_network(
             f"Unsupported season: {season}"
         )
 
+    if (
+        not isinstance(
+            operational_buffer,
+            (int, float),
+        )
+        or operational_buffer < 0
+        or operational_buffer >= 1
+    ):
+        raise ValueError(
+            "Operational buffer must be "
+            "between 0 and 1."
+        )
+
     # --------------------------------------------------
     # Load fleet assumptions
     # --------------------------------------------------
@@ -320,10 +334,20 @@ def optimize_network(
     # Calculate weekly fleet capacity
     # --------------------------------------------------
 
-    available_aircraft_hours = (
+    theoretical_aircraft_hours = (
         fleet_size
         * usable_hours_per_day
         * 7
+    )
+
+    reserved_aircraft_hours = (
+        theoretical_aircraft_hours
+        * operational_buffer
+    )
+
+    available_aircraft_hours = (
+        theoretical_aircraft_hours
+        - reserved_aircraft_hours
     )
 
     # CP-SAT requires integer coefficients,
@@ -538,14 +562,11 @@ def optimize_network(
     )
 
     if available_aircraft_hours > 0:
-
         fleet_utilization = (
             total_aircraft_hours
             / available_aircraft_hours
         )
-
     else:
-
         fleet_utilization = 0.0
 
     active_routes = results[
@@ -674,6 +695,15 @@ def optimize_network(
         "total_aircraft_hours": total_aircraft_hours,
         "available_aircraft_hours": available_aircraft_hours,
         "fleet_utilization": fleet_utilization,
+        "operational_buffer": (
+            operational_buffer
+        ),
+        "theoretical_aircraft_hours": (
+            theoretical_aircraft_hours
+        ),
+        "reserved_aircraft_hours": (
+            reserved_aircraft_hours
+        ),
         "destinations_served": destinations_served,
         "season": season,
     }

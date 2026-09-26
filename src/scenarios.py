@@ -10,6 +10,7 @@ from src.optimizer import optimize_network
 def compare_fleet_scenarios(
     fleet_sizes,
     season="shoulder",
+    operational_buffer=0.0,
 ):
     """
     Run the Aerofrite optimizer for multiple
@@ -74,6 +75,7 @@ def compare_fleet_scenarios(
         result = optimize_network(
             fleet_size_override=fleet_size,
             season=season,
+            operational_buffer=operational_buffer,
             save_output=False,
             print_results=False,
         )
@@ -366,6 +368,7 @@ def compare_networks(
 
 def compare_season_scenarios(
     fleet_size,
+    operational_buffer=0.0,
 ):
     """
     Compare Aerofrite's optimized network across
@@ -416,6 +419,7 @@ def compare_season_scenarios(
         result = optimize_network(
             fleet_size_override=fleet_size,
             season=season,
+            operational_buffer=operational_buffer,
             save_output=False,
             print_results=False,
         )

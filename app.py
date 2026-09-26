@@ -76,6 +76,33 @@ season = st.sidebar.selectbox(
     ),
 )
 
+operational_buffer_percent = (
+    st.sidebar.slider(
+        "Operational reserve",
+        min_value=0,
+        max_value=25,
+        value=10,
+        step=1,
+        format="%d%%",
+        help=(
+            "Share of theoretical aircraft capacity "
+            "reserved for maintenance, disruption "
+            "recovery, and operational flexibility."
+        ),
+    )
+)
+
+st.sidebar.caption(
+    "Route decisions are discrete, so several "
+    "reserve levels may produce the same optimized "
+    "network until a capacity threshold is crossed."
+)
+
+operational_buffer = (
+    operational_buffer_percent
+    / 100
+)
+
 
 # --------------------------------------------------
 # Run optimizer
@@ -84,6 +111,7 @@ season = st.sidebar.selectbox(
 result = optimize_network(
     fleet_size_override=fleet_size,
     season=season,
+    operational_buffer=operational_buffer,
     save_output=False,
     print_results=False,
 )
@@ -160,6 +188,51 @@ if not route_details.empty:
     ] = (
         route_details["passengers"]
         / route_details["weekly_demand"]
+    )
+
+# --------------------------------------------------
+# Build reference data for all candidate routes
+# --------------------------------------------------
+
+all_route_details = all_routes.merge(
+    route_reference[
+        [
+            "route_id",
+            "destination",
+            "distance_km",
+            "weekly_demand",
+        ]
+    ],
+    on="route_id",
+    how="left",
+)
+
+all_route_details = all_route_details.merge(
+    airport_reference[
+        [
+            "iata",
+            "name",
+            "city",
+        ]
+    ],
+    left_on="destination",
+    right_on="iata",
+    how="left",
+)
+
+all_route_details = all_route_details.rename(
+    columns={
+        "name": "airport_name",
+    }
+)
+
+if not all_route_details.empty:
+
+    all_route_details[
+        "base_demand_capture"
+    ] = (
+        all_route_details["passengers"]
+        / all_route_details["weekly_demand"]
     )
 
 # --------------------------------------------------
@@ -303,7 +376,7 @@ col4.metric(
 # Additional metrics
 # --------------------------------------------------
 
-col5, col6, col7 = st.columns(3)
+col5, col6, col7, col8 = st.columns(4)
 
 col5.metric(
     "Weekly Revenue",
@@ -316,12 +389,36 @@ col6.metric(
 )
 
 col7.metric(
-    "Aircraft Hours",
+    "Planning Capacity",
     (
-        f"{result['total_aircraft_hours']:.1f} "
-        f"/ "
-        f"{result['available_aircraft_hours']:.1f}"
+        f"{result['available_aircraft_hours']:.1f} h"
     ),
+    help=(
+        "Aircraft hours available to the optimizer "
+        "after the operational reserve is removed."
+    ),
+)
+
+col8.metric(
+    "Scheduled Hours",
+    (
+        f"{result['total_aircraft_hours']:.1f} h"
+    ),
+    help=(
+        "Aircraft hours used by the optimized network."
+    ),
+)
+
+st.caption(
+    (
+        f"Theoretical fleet capacity: "
+        f"{result['theoretical_aircraft_hours']:.1f} h "
+        f"• Operational reserve: "
+        f"{result['reserved_aircraft_hours']:.1f} h "
+        f"({result['operational_buffer']:.0%}) "
+        f"• Planning capacity: "
+        f"{result['available_aircraft_hours']:.1f} h"
+    )
 )
 
 # --------------------------------------------------
@@ -453,7 +550,7 @@ if route_details.empty:
 else:
 
     route_options = (
-        route_details[
+        all_route_details[
             "route_id"
         ]
         .sort_values()
@@ -463,11 +560,12 @@ else:
     selected_route_id = st.selectbox(
         "Select a route",
         options=route_options,
+        key="route_inspector_route",
     )
 
     selected_route = (
-        route_details[
-            route_details["route_id"]
+        all_route_details[
+            all_route_details["route_id"]
             == selected_route_id
         ]
         .iloc[0]
@@ -482,6 +580,17 @@ else:
         f"{selected_route['airport_name']} • "
         f"{selected_route['distance_km']:,.0f} km from Brussels"
     )
+
+    if selected_route["frequency"] > 0:
+        st.success(
+            "Selected in the optimized network"
+        )
+
+    else:
+
+        st.warning(
+            "Not selected in the current optimized network"
+        )
 
     inspect_col1, inspect_col2, inspect_col3 = (
         st.columns(3)
@@ -792,6 +901,9 @@ scenario_summary, scenario_results = (
     compare_fleet_scenarios(
         scenario_fleet_sizes,
         season=season,
+        operational_buffer=(
+            operational_buffer
+        ),
     )
 )
 
@@ -1218,6 +1330,143 @@ else:
     )
 
 # --------------------------------------------------
+# Operational resilience analysis
+# --------------------------------------------------
+
+st.subheader("Operational Resilience")
+
+st.write(
+    """
+    Compare how reserving part of the fleet's theoretical
+    capacity for maintenance, disruption recovery, and
+    operational flexibility changes the optimized network.
+    """
+)
+
+buffer_scenarios = [
+    0.00,
+    0.05,
+    0.10,
+    0.15,
+    0.20,
+    0.25,
+]
+
+buffer_rows = []
+
+for buffer_value in buffer_scenarios:
+
+    buffer_result = optimize_network(
+        fleet_size_override=fleet_size,
+        season=season,
+        operational_buffer=buffer_value,
+        save_output=False,
+        print_results=False,
+    )
+
+    buffer_rows.append(
+        {
+            "Operational Reserve (%)":
+                buffer_value * 100,
+
+            "Planning Capacity (h)":
+                buffer_result[
+                    "available_aircraft_hours"
+                ],
+
+            "Scheduled Hours":
+                buffer_result[
+                    "total_aircraft_hours"
+                ],
+
+            "Destinations":
+                buffer_result[
+                    "destinations_served"
+                ],
+
+            "Passengers":
+                buffer_result[
+                    "total_passengers"
+                ],
+
+            "Contribution (€)":
+                buffer_result[
+                    "total_contribution"
+                ],
+        }
+    )
+
+buffer_analysis = pd.DataFrame(
+    buffer_rows
+)
+
+st.dataframe(
+    buffer_analysis,
+    use_container_width=True,
+    hide_index=True,
+    column_config={
+        "Operational Reserve (%)":
+            st.column_config.NumberColumn(
+                format="%.0f%%",
+            ),
+
+        "Planning Capacity (h)":
+            st.column_config.NumberColumn(
+                format="%.1f",
+            ),
+
+        "Scheduled Hours":
+            st.column_config.NumberColumn(
+                format="%.1f",
+            ),
+
+        "Destinations":
+            st.column_config.NumberColumn(
+                format="%d",
+            ),
+
+        "Passengers":
+            st.column_config.NumberColumn(
+                format="%d",
+            ),
+
+        "Contribution (€)":
+            st.column_config.NumberColumn(
+                format="localized",
+            ),
+    },
+)
+
+buffer_chart = (
+    buffer_analysis[
+        [
+            "Operational Reserve (%)",
+            "Contribution (€)",
+        ]
+    ]
+    .set_index(
+        "Operational Reserve (%)"
+    )
+)
+
+st.markdown(
+    "**Modeled Contribution vs Operational Reserve**"
+)
+
+st.line_chart(
+    buffer_chart
+)
+
+st.caption(
+    """
+    Higher reserve levels reduce the capacity available
+    for scheduled flying. The resulting reduction in
+    modeled contribution represents the opportunity cost
+    of maintaining greater operational flexibility.
+    """
+)
+
+# --------------------------------------------------
 # Seasonal network comparison
 # --------------------------------------------------
 
@@ -1233,7 +1482,10 @@ st.write(
 
 season_summary, season_results = (
     compare_season_scenarios(
-        fleet_size=fleet_size
+        fleet_size=fleet_size,
+        operational_buffer=(
+            operational_buffer
+        ),
     )
 )
 
