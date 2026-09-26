@@ -13,6 +13,7 @@ from src.demand import (
     build_frequency_curve,
     calculate_effective_demand,
 )
+from src.case_study import build_case_study
 
 ROUTES_PATH = "data/routes.csv"
 AIRPORTS_PATH = "data/airports.csv"
@@ -1840,6 +1841,297 @@ else:
         },
     )
 
+# --------------------------------------------------
+# Case study summary
+# --------------------------------------------------
+
+st.subheader("Case Study: Seasonal Network Strategy")
+
+st.write(
+    """
+    A fixed planning case study evaluates how Aerofrite should
+    deploy a five-aircraft A320neo fleet across winter,
+    shoulder, and summer demand while preserving a 10%
+    operational reserve.
+    """
+)
+
+case_study = build_case_study()
+
+case_seasonal_summary = (
+    case_study[
+        "seasonal_summary"
+    ].copy()
+)
+
+case_seasonal_impact = (
+    case_study[
+        "seasonal_impact"
+    ]
+)
+
+case_resilience_impact = (
+    case_study[
+        "resilience_impact"
+    ]
+)
+
+case_network_changes = (
+    case_study[
+        "winter_to_summer"
+    ].copy()
+)
+
+
+# --------------------------------------------------
+# Case-study assumptions
+# --------------------------------------------------
+
+st.caption(
+    """
+    Fixed case-study assumptions:
+    5 Airbus A320neo aircraft • 10% operational reserve •
+    Brussels hub • identical fleet capacity across seasons.
+    """
+)
+
+
+# --------------------------------------------------
+# Headline seasonal findings
+# --------------------------------------------------
+
+winter_row = (
+    case_seasonal_summary[
+        case_seasonal_summary[
+            "Season"
+        ] == "Winter"
+    ]
+    .iloc[0]
+)
+
+summer_row = (
+    case_seasonal_summary[
+        case_seasonal_summary[
+            "Season"
+        ] == "Summer"
+    ]
+    .iloc[0]
+)
+
+
+case_col1, case_col2, case_col3, case_col4 = (
+    st.columns(4)
+)
+
+case_col1.metric(
+    "Winter Passengers",
+    f"{int(winter_row['Passengers']):,}",
+)
+
+case_col2.metric(
+    "Summer Passengers",
+    f"{int(summer_row['Passengers']):,}",
+    delta=(
+        f"{case_seasonal_impact['passenger_change']:+,}"
+    ),
+)
+
+case_col3.metric(
+    "Summer Contribution",
+    (
+        f"€"
+        f"{summer_row['Contribution (€)']:,.0f}"
+    ),
+    delta=(
+        f"+€"
+        f"{case_seasonal_impact['contribution_change']:,.0f}"
+    ),
+)
+
+case_col4.metric(
+    "Destination Change",
+    (
+        f"{int(winter_row['Destinations'])}"
+        f" → "
+        f"{int(summer_row['Destinations'])}"
+    ),
+    delta=(
+        f"{case_seasonal_impact['destination_change']:+d}"
+    ),
+)
+
+st.markdown(
+    "**Seasonal Planning Results**"
+)
+
+st.dataframe(
+    case_seasonal_summary,
+    use_container_width=True,
+    hide_index=True,
+    column_config={
+        "Season":
+            st.column_config.TextColumn(
+                "Season"
+            ),
+
+        "Destinations":
+            st.column_config.NumberColumn(
+                format="%d",
+            ),
+
+        "Passengers":
+            st.column_config.NumberColumn(
+                format="%d",
+            ),
+
+        "Revenue (€)":
+            st.column_config.NumberColumn(
+                format="localized",
+            ),
+
+        "Cost (€)":
+            st.column_config.NumberColumn(
+                format="localized",
+            ),
+
+        "Contribution (€)":
+            st.column_config.NumberColumn(
+                format="localized",
+            ),
+
+        "Scheduled Hours":
+            st.column_config.NumberColumn(
+                format="%.1f",
+            ),
+
+        "Planning Capacity":
+            st.column_config.NumberColumn(
+                format="%.1f",
+            ),
+
+        "Planning Utilization (%)":
+            st.column_config.NumberColumn(
+                format="%.1f%%",
+            ),
+    },
+)
+
+seasonal_passenger_percent = (
+    case_seasonal_impact[
+        "passenger_change"
+    ]
+    / winter_row["Passengers"]
+    * 100
+)
+
+seasonal_contribution_percent = (
+    case_seasonal_impact[
+        "contribution_change"
+    ]
+    / winter_row["Contribution (€)"]
+    * 100
+)
+
+resilience_contribution_percent = (
+    abs(
+        case_resilience_impact[
+            "contribution_change"
+        ]
+    )
+    / case_study[
+        "resilience_summary"
+    ]
+    .iloc[0][
+        "Contribution (€)"
+    ]
+    * 100
+)
+
+
+st.markdown(
+    "**Key Planning Findings**"
+)
+
+st.write(
+    (
+        f"**Seasonal reallocation:** "
+        f"With fleet size and operational reserve held constant, "
+        f"the summer network carries "
+        f"{seasonal_passenger_percent:.1f}% more passengers "
+        f"and produces "
+        f"{seasonal_contribution_percent:.1f}% more modeled "
+        f"weekly contribution than the winter network."
+    )
+)
+
+st.write(
+    (
+        f"**Operational resilience:** "
+        f"Reserving "
+        f"{case_resilience_impact['reserved_hours']:.1f} "
+        f"aircraft-hours in the shoulder-season case reduces "
+        f"modeled weekly contribution by approximately "
+        f"€{abs(case_resilience_impact['contribution_change']):,.0f} "
+        f"({resilience_contribution_percent:.1f}%) compared with "
+        f"scheduling the full theoretical fleet capacity."
+    )
+)
+
+with st.expander(
+    "View Winter → Summer network changes"
+):
+
+    st.dataframe(
+        case_network_changes,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Route":
+                st.column_config.TextColumn(
+                    "Route",
+                ),
+
+            "Frequency A":
+                st.column_config.NumberColumn(
+                    "Winter",
+                    format="%d",
+                ),
+
+            "Frequency B":
+                st.column_config.NumberColumn(
+                    "Summer",
+                    format="%d",
+                ),
+
+            "Frequency Change":
+                st.column_config.NumberColumn(
+                    "Change",
+                    format="%+d",
+                ),
+
+            "Change Type":
+                st.column_config.TextColumn(
+                    "Change Type",
+                ),
+        },
+    )
+
+    st.caption(
+        """
+        These network changes are optimization results under
+        Aerofrite's modeled seasonal-demand assumptions.
+        They should not be interpreted as forecasts of actual
+        airline route decisions.
+        """
+    )
+
+st.caption(
+    """
+    The repository's CASE_STUDY.md contains the full planning
+    problem, assumptions, methodology, interpretation, and
+    model limitations.
+    """
+)
 
 # --------------------------------------------------
 # Demand model explorer
