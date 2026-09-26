@@ -1381,6 +1381,257 @@ with st.expander(
     )
 
 # --------------------------------------------------
+# Demand behavior in optimized network
+# --------------------------------------------------
+
+st.subheader("Demand Behavior in Optimized Network")
+
+st.write(
+    """
+    The table below shows how Aerofrite's selected
+    frequencies translate base market demand into
+    modeled effective demand for the current
+    optimized network.
+    """
+)
+
+if route_details.empty:
+
+    st.info(
+        "No active routes are available "
+        "for demand analysis."
+    )
+
+else:
+
+    network_demand = route_details.copy()
+
+    # --------------------------------------------------
+    # Calculate demand-capture metrics
+    # --------------------------------------------------
+
+    network_demand[
+        "frequency_demand_capture"
+    ] = (
+        network_demand[
+            "effective_demand"
+        ]
+        / network_demand[
+            "weekly_demand"
+        ]
+        * 100
+    )
+
+    network_demand[
+        "passenger_capture"
+    ] = (
+        network_demand[
+            "passengers"
+        ]
+        / network_demand[
+            "weekly_demand"
+        ]
+        * 100
+    )
+
+    network_demand[
+        "load_factor_percent"
+    ] = (
+        network_demand[
+            "load_factor"
+        ]
+        * 100
+    )
+
+
+    # --------------------------------------------------
+    # Network demand table
+    # --------------------------------------------------
+
+    demand_display = network_demand[
+        [
+            "route_id",
+            "city",
+            "market_type",
+            "frequency",
+            "weekly_demand",
+            "effective_demand",
+            "passengers",
+            "frequency_demand_capture",
+            "load_factor_percent",
+        ]
+    ].copy()
+
+    demand_display = demand_display.rename(
+        columns={
+            "route_id": "Route",
+            "city": "Destination",
+            "market_type": "Market Type",
+            "frequency": "Weekly Frequency",
+            "weekly_demand": "Base Demand",
+            "effective_demand": "Effective Demand",
+            "passengers": "Passengers",
+            "frequency_demand_capture":
+                "Modeled Demand Capture",
+            "load_factor_percent":
+                "Load Factor",
+        }
+    )
+
+    demand_display[
+        "Market Type"
+    ] = (
+        demand_display[
+            "Market Type"
+        ]
+        .str.title()
+    )
+
+    demand_display = (
+        demand_display.sort_values(
+            by=[
+                "Market Type",
+                "Weekly Frequency",
+            ],
+            ascending=[
+                True,
+                False,
+            ],
+        )
+    )
+
+    st.dataframe(
+        demand_display,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Weekly Frequency":
+                st.column_config.NumberColumn(
+                    format="%d",
+                ),
+            "Base Demand":
+                st.column_config.NumberColumn(
+                    format="%d",
+                ),
+            "Effective Demand":
+                st.column_config.NumberColumn(
+                    format="%d",
+                ),
+            "Passengers":
+                st.column_config.NumberColumn(
+                    format="%d",
+                ),
+            "Modeled Demand Capture":
+                st.column_config.NumberColumn(
+                    format="%.1f%%",
+                ),
+            "Load Factor":
+                st.column_config.NumberColumn(
+                    format="%.1f%%",
+                ),
+        },
+    )
+
+# --------------------------------------------------
+# Summary by market type
+# --------------------------------------------------
+
+st.markdown(
+    "**Frequency Strategy by Market Type**"
+)
+
+market_summary = (
+    network_demand.groupby(
+        "market_type"
+    )
+    .agg(
+        routes=(
+            "route_id",
+            "count",
+        ),
+        average_frequency=(
+            "frequency",
+            "mean",
+        ),
+        average_demand_capture=(
+            "frequency_demand_capture",
+            "mean",
+        ),
+        total_passengers=(
+            "passengers",
+            "sum",
+        ),
+        average_load_factor=(
+            "load_factor_percent",
+            "mean",
+        ),
+    )
+    .reset_index()
+)
+
+market_summary[
+    "market_type"
+] = (
+    market_summary[
+        "market_type"
+    ]
+    .str.title()
+)
+
+market_summary = market_summary.rename(
+    columns={
+        "market_type": "Market Type",
+        "routes": "Routes",
+        "average_frequency":
+            "Average Frequency",
+        "average_demand_capture":
+            "Average Demand Capture",
+        "total_passengers":
+            "Passengers",
+        "average_load_factor":
+            "Average Load Factor",
+    }
+)
+
+st.dataframe(
+    market_summary,
+    use_container_width=True,
+    hide_index=True,
+    column_config={
+        "Routes":
+            st.column_config.NumberColumn(
+                format="%d",
+            ),
+        "Average Frequency":
+            st.column_config.NumberColumn(
+                format="%.1f",
+            ),
+        "Average Demand Capture":
+            st.column_config.NumberColumn(
+                format="%.1f%%",
+            ),
+        "Passengers":
+            st.column_config.NumberColumn(
+                format="%d",
+            ),
+        "Average Load Factor":
+            st.column_config.NumberColumn(
+                format="%.1f%%",
+            ),
+    },
+)
+
+st.caption(
+    """
+    These patterns are outcomes of both the frequency-sensitive
+    demand assumptions and the network optimization. They should
+    not be interpreted as observed airline-market behavior.
+    """
+)
+
+
+
+# --------------------------------------------------
 # Closed route analysis
 # --------------------------------------------------
 
