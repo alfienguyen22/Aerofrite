@@ -524,32 +524,119 @@ else:
         f"{selected_route['aircraft_hours']:.1f}",
     )
 
-    st.markdown("**Demand Profile**")
+    # --------------------------------------------------
+# Commercial demand chain
+# --------------------------------------------------
 
-    demand_col1, demand_col2, demand_col3 = (
-        st.columns(3)
-    )
+st.markdown("**Commercial Demand Chain**")
 
-    demand_col1.metric(
-        "Base Weekly Demand",
-        f"{int(selected_route['weekly_demand']):,}",
-    )
 
-    demand_col2.metric(
-        "Effective Demand",
-        f"{int(selected_route['effective_demand']):,}",
-    )
+# --------------------------------------------------
+# Market context
+# --------------------------------------------------
 
-    demand_col3.metric(
-        "Base Demand Captured",
-        f"{selected_route['base_demand_capture']:.1%}",
-    )
+context_col1, context_col2 = st.columns(2)
 
-    st.caption(
-        "Effective demand reflects Aerofrite's modeled "
-        "seasonality, competition, and frequency-sensitive "
-        "market adjustments."
-    )
+context_col1.metric(
+    "Planning Season",
+    selected_route["season"].title(),
+)
+
+context_col2.metric(
+    "Competition Level",
+    selected_route[
+        "competition_level"
+    ].title(),
+)
+
+
+# --------------------------------------------------
+# Market demand adjustments
+# --------------------------------------------------
+
+demand_col1, demand_col2, demand_col3 = (
+    st.columns(3)
+)
+
+demand_col1.metric(
+    "Base Weekly Demand",
+    f"{int(selected_route['weekly_demand']):,}",
+)
+
+demand_col2.metric(
+    "Seasonal Factor",
+    (
+        f"{selected_route['seasonality_multiplier']:.0%}"
+    ),
+)
+
+demand_col3.metric(
+    "Competition Factor",
+    (
+        f"{selected_route['competition_multiplier']:.0%}"
+    ),
+)
+
+
+# --------------------------------------------------
+# Adjusted and frequency-sensitive demand
+# --------------------------------------------------
+
+adjusted_col1, adjusted_col2, adjusted_col3 = (
+    st.columns(3)
+)
+
+adjusted_col1.metric(
+    "Adjusted Market Demand",
+    (
+        f"{int(selected_route['adjusted_market_demand']):,}"
+    ),
+)
+
+adjusted_col2.metric(
+    "Frequency Capture",
+    (
+        f"{selected_route['demand_multiplier']:.0%}"
+    ),
+)
+
+adjusted_col3.metric(
+    "Effective Demand",
+    (
+        f"{int(selected_route['effective_demand']):,}"
+    ),
+)
+
+
+# --------------------------------------------------
+# Final passenger outcome
+# --------------------------------------------------
+
+outcome_col1, outcome_col2 = st.columns(2)
+
+outcome_col1.metric(
+    "Passengers Carried",
+    (
+        f"{int(selected_route['passengers']):,}"
+    ),
+)
+
+outcome_col2.metric(
+    "Load Factor",
+    (
+        f"{selected_route['load_factor']:.1%}"
+    ),
+)
+
+
+st.caption(
+    """
+    Base demand is first adjusted for seasonality and
+    competition. Aerofrite's frequency-response assumption
+    is then applied to produce effective demand. Actual
+    passengers are limited by available seat capacity.
+    """
+)
 
 # --------------------------------------------------
 # Active route table
