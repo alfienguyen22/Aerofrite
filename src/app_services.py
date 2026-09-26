@@ -3,6 +3,11 @@ import streamlit as st
 
 from src.economics import calculate_route_economics
 from src.optimizer import optimize_network
+from src.scenarios import (
+    analyze_reserve_breakpoints,
+    compare_fleet_scenarios,
+    compare_season_scenarios,
+)
 
 
 ROUTES_PATH = "data/routes.csv"
@@ -431,4 +436,89 @@ def get_closed_route_analysis(
 
     return pd.DataFrame(
         rows
+    )
+
+# --------------------------------------------------
+# Cached fleet-scenario analysis
+# --------------------------------------------------
+
+@st.cache_data(
+    show_spinner=False
+)
+def get_fleet_scenario_analysis(
+    fleet_sizes,
+    season,
+    operational_buffer,
+):
+    """
+    Compare multiple fleet-size scenarios while
+    holding season and operational reserve constant.
+    """
+
+    return compare_fleet_scenarios(
+        fleet_sizes=list(
+            fleet_sizes
+        ),
+        season=season,
+        operational_buffer=(
+            operational_buffer
+        ),
+    )
+
+
+# --------------------------------------------------
+# Cached seasonal-scenario analysis
+# --------------------------------------------------
+
+@st.cache_data(
+    show_spinner=False
+)
+def get_season_scenario_analysis(
+    fleet_size,
+    operational_buffer,
+):
+    """
+    Compare winter, shoulder, and summer while
+    holding fleet size and reserve constant.
+    """
+
+    return compare_season_scenarios(
+        fleet_size=fleet_size,
+        operational_buffer=(
+            operational_buffer
+        ),
+    )
+
+
+# --------------------------------------------------
+# Cached reserve-breakpoint analysis
+# --------------------------------------------------
+
+@st.cache_data(
+    show_spinner=False
+)
+def get_reserve_breakpoint_analysis(
+    fleet_size,
+    season,
+    min_buffer_percent=0,
+    max_buffer_percent=25,
+    step_percent=1,
+):
+    """
+    Find reserve levels where the optimized
+    network changes.
+    """
+
+    return analyze_reserve_breakpoints(
+        fleet_size=fleet_size,
+        season=season,
+        min_buffer_percent=(
+            min_buffer_percent
+        ),
+        max_buffer_percent=(
+            max_buffer_percent
+        ),
+        step_percent=(
+            step_percent
+        ),
     )
