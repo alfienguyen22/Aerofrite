@@ -1,4 +1,8 @@
 import pandas as pd
+from src.demand import (
+    calculate_effective_demand,
+    get_frequency_multiplier,
+)
 
 
 # File paths
@@ -6,33 +10,35 @@ ROUTES_PATH = "data/routes.csv"
 AIRCRAFT_PATH = "data/aircraft.csv"
 
 
-# Frequency-sensitive demand assumptions
-FREQUENCY_DEMAND_MULTIPLIERS = {
-    "business": {
-        0: 0.00,
-        3: 0.30,
-        4: 0.45,
-        7: 1.00,
-        10: 1.12,
-        14: 1.25,
-    },
-    "mixed": {
-        0: 0.00,
-        3: 0.45,
-        4: 0.60,
-        7: 1.00,
-        10: 1.08,
-        14: 1.15,
-    },
-    "leisure": {
-        0: 0.00,
-        3: 0.60,
-        4: 0.75,
-        7: 1.00,
-        10: 1.04,
-        14: 1.08,
-    },
-}
+# Frequency-sensitive demand assumptions.
+# THIS HAS BEEN MIGRATED TO DEMAND.PY
+# =======================================================
+# FREQUENCY_DEMAND_MULTIPLIERS = {
+#     "business": {
+#         0: 0.00,
+#         3: 0.30,
+#         4: 0.45,
+#         7: 1.00,
+#         10: 1.12,
+#         14: 1.25,
+#     },
+#     "mixed": {
+#         0: 0.00,
+#         3: 0.45,
+#         4: 0.60,
+#         7: 1.00,
+#         10: 1.08,
+#         14: 1.15,
+#     },
+#     "leisure": {
+#         0: 0.00,
+#         3: 0.60,
+#         4: 0.75,
+#         7: 1.00,
+#         10: 1.04,
+#         14: 1.08,
+#     },
+# }
 
 
 def calculate_route_economics(
@@ -63,27 +69,11 @@ def calculate_route_economics(
 
     market_type = route["market_type"]
 
-    if market_type not in FREQUENCY_DEMAND_MULTIPLIERS:
-        raise ValueError(
-            f"Unknown market type: {market_type}"
-        )
-
-    if (
-        frequency
-        not in FREQUENCY_DEMAND_MULTIPLIERS[
-            market_type
-        ]
-    ):
-        raise ValueError(
-            f"No demand multiplier defined for "
-            f"{market_type} market at frequency "
-            f"{frequency}"
-        )
-
     demand_multiplier = (
-        FREQUENCY_DEMAND_MULTIPLIERS[
-            market_type
-        ][frequency]
+        get_frequency_multiplier(
+            market_type=market_type,
+            frequency=frequency,
+        )
     )
 
     # If the route is closed, all economics are zero.
@@ -107,9 +97,14 @@ def calculate_route_economics(
         }
 
     # Demand Aerofrite can capture at this frequency.
-    effective_demand = round(
-        route["weekly_demand"]
-        * demand_multiplier
+    effective_demand = (
+        calculate_effective_demand(
+            base_weekly_demand=route[
+                "weekly_demand"
+            ],
+            market_type=market_type,
+            frequency=frequency,
+        )
     )
 
     # Weekly capacity across both directions.

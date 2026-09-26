@@ -208,8 +208,8 @@ def test_unsupported_frequency_is_rejected(
 ):
     """
     The economics model should reject
-    frequencies for which no demand
-    multiplier has been defined.
+    frequencies that are unsupported by
+    the demand model.
     """
 
     route = make_test_route(
@@ -218,14 +218,14 @@ def test_unsupported_frequency_is_rejected(
 
     with pytest.raises(
         ValueError,
-        match="No demand multiplier defined",
+        match="Unsupported frequency",
     ):
+
         calculate_route_economics(
             route=route,
             frequency=invalid_frequency,
             seats=180,
         )
-
 
 @pytest.mark.parametrize(
     "market_type",

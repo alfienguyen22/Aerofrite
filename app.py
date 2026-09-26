@@ -8,6 +8,10 @@ from src.scenarios import (
 from src.economics import calculate_route_economics
 from src.optimizer import optimize_network
 from src.map_utils import build_network_map
+from src.demand import (
+    build_frequency_curve,
+    calculate_effective_demand,
+)
 
 ROUTES_PATH = "data/routes.csv"
 AIRPORTS_PATH = "data/airports.csv"
@@ -1105,6 +1109,275 @@ else:
                     "Change Type",
                 ),
         },
+    )
+# --------------------------------------------------
+# Demand model explorer
+# --------------------------------------------------
+
+st.subheader("Demand Model Explorer")
+
+st.write(
+    """
+    Aerofrite models passenger demand as frequency-sensitive.
+    Business markets are assumed to respond more strongly to
+    increased flight frequency than leisure markets, while mixed
+    markets sit between the two.
+    """
+)
+
+
+# --------------------------------------------------
+# Build frequency-response data
+# --------------------------------------------------
+
+frequency_curve = pd.DataFrame(
+    build_frequency_curve()
+)
+
+
+# --------------------------------------------------
+# Demand capture curve
+# --------------------------------------------------
+
+st.markdown(
+    "**Modeled Demand Capture by Weekly Frequency**"
+)
+
+capture_chart = (
+    frequency_curve.pivot(
+        index="Weekly Frequency",
+        columns="Market Type",
+        values="Demand Capture (%)",
+    )
+    .rename(
+        columns={
+            "business": "Business",
+            "mixed": "Mixed",
+            "leisure": "Leisure",
+        }
+    )
+)
+
+st.line_chart(
+    capture_chart
+)
+
+st.caption(
+    """
+    Seven weekly flights represent the baseline demand level
+    of 100%. Values above 100% represent additional modeled
+    market capture from offering more frequent service.
+    """
+)
+
+# --------------------------------------------------
+# Interactive demand example
+# --------------------------------------------------
+
+st.markdown(
+    "**Explore a Hypothetical Market**"
+)
+
+explorer_col1, explorer_col2 = st.columns(2)
+
+with explorer_col1:
+
+    explorer_market_type = st.selectbox(
+        "Market type",
+        options=[
+            "business",
+            "mixed",
+            "leisure",
+        ],
+        index=1,
+        key="demand_market_type",
+    )
+
+with explorer_col2:
+
+    explorer_base_demand = st.slider(
+        "Base weekly demand",
+        min_value=500,
+        max_value=5000,
+        value=2000,
+        step=100,
+        key="demand_base_demand",
+    )
+
+# --------------------------------------------------
+# Calculate frequency-sensitive demand
+# --------------------------------------------------
+
+explorer_frequencies = [
+    0,
+    3,
+    4,
+    7,
+    10,
+    14,
+]
+
+explorer_rows = []
+
+for frequency in explorer_frequencies:
+
+    effective_demand = (
+        calculate_effective_demand(
+            base_weekly_demand=(
+                explorer_base_demand
+            ),
+            market_type=(
+                explorer_market_type
+            ),
+            frequency=frequency,
+        )
+    )
+
+    explorer_rows.append(
+        {
+            "Weekly Frequency":
+                frequency,
+            "Effective Demand":
+                effective_demand,
+            "Demand Capture (%)":
+                (
+                    effective_demand
+                    / explorer_base_demand
+                    * 100
+                ),
+        }
+    )
+
+explorer_demand = pd.DataFrame(
+    explorer_rows
+)
+
+st.markdown(
+    f"**Effective Demand — "
+    f"{explorer_market_type.title()} Market**"
+)
+
+effective_demand_chart = (
+    explorer_demand[
+        [
+            "Weekly Frequency",
+            "Effective Demand",
+        ]
+    ]
+    .set_index(
+        "Weekly Frequency"
+    )
+)
+
+st.bar_chart(
+    effective_demand_chart
+)
+
+# --------------------------------------------------
+# Key frequency examples
+# --------------------------------------------------
+
+freq_3_demand = (
+    calculate_effective_demand(
+        base_weekly_demand=(
+            explorer_base_demand
+        ),
+        market_type=(
+            explorer_market_type
+        ),
+        frequency=3,
+    )
+)
+
+freq_7_demand = (
+    calculate_effective_demand(
+        base_weekly_demand=(
+            explorer_base_demand
+        ),
+        market_type=(
+            explorer_market_type
+        ),
+        frequency=7,
+    )
+)
+
+freq_14_demand = (
+    calculate_effective_demand(
+        base_weekly_demand=(
+            explorer_base_demand
+        ),
+        market_type=(
+            explorer_market_type
+        ),
+        frequency=14,
+    )
+)
+
+demand_metric1, demand_metric2, (
+    demand_metric3
+) = st.columns(3)
+
+demand_metric1.metric(
+    "3x Weekly",
+    f"{freq_3_demand:,} passengers",
+)
+
+demand_metric2.metric(
+    "Daily",
+    f"{freq_7_demand:,} passengers",
+)
+
+demand_metric3.metric(
+    "2x Daily",
+    f"{freq_14_demand:,} passengers",
+)
+
+with st.expander(
+    "View demand model assumptions"
+):
+
+    assumption_table = (
+        frequency_curve[
+            [
+                "Market Type",
+                "Weekly Frequency",
+                "Demand Capture (%)",
+            ]
+        ]
+        .copy()
+    )
+
+    assumption_table[
+        "Market Type"
+    ] = (
+        assumption_table[
+            "Market Type"
+        ]
+        .str.title()
+    )
+
+    st.dataframe(
+        assumption_table,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Weekly Frequency":
+                st.column_config.NumberColumn(
+                    format="%d",
+                ),
+            "Demand Capture (%)":
+                st.column_config.NumberColumn(
+                    format="%.0f%%",
+                ),
+        },
+    )
+
+    st.caption(
+        """
+        These response factors are transparent modeling
+        assumptions for Aerofrite and are not calibrated
+        forecasts of observed airline passenger behavior.
+        """
     )
 
 # --------------------------------------------------
