@@ -8,6 +8,16 @@ The project combines **route economics, demand modeling, fleet-capacity constrai
 
 **[🚀 Launch the Live App](https://aerofrite.streamlit.app/)**
 
+---
+
+## Preview
+
+![Aerofrite Network Overview](assets/network-overview.png)
+
+*Interactive optimization of a fictional Brussels-based airline network under fleet capacity, demand, seasonality, competition, and operational-reserve constraints.*
+
+---
+
 > **Note:** Aerofrite is a fictional airline and a portfolio project. Commercial demand, fares, costs, competition, and seasonal effects are modeled assumptions rather than forecasts of actual airline performance.
 
 ---
@@ -46,6 +56,24 @@ The application contains six analysis areas:
 | **Methodology** | Review optimization logic, assumptions, equations, data classification, and limitations |
 
 ---
+
+### Route Analysis
+
+![Aerofrite Route Analysis](assets/route-analysis.png)
+
+Inspect individual route economics, demand assumptions, frequency alternatives, and whether a route is selected in the optimized network.
+
+### Scenario Analysis
+
+![Aerofrite Scenario Analysis](assets/scenario-analysis.png)
+
+Compare fleet capacity, seasonal strategies, and the commercial tradeoff of maintaining operational reserve.
+
+### Case Study
+
+![Aerofrite Case Study](assets/case-study.png)
+
+A reproducible five-aircraft case study showing how the optimized network changes between winter, shoulder, and summer conditions.
 
 ## Key Features
 
