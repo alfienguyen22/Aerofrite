@@ -1,6 +1,10 @@
 import pandas as pd
 import streamlit as st
 
+from src.scenarios import (
+    compare_fleet_scenarios,
+    compare_networks,
+)
 from src.economics import calculate_route_economics
 from src.optimizer import optimize_network
 from src.map_utils import build_network_map
@@ -652,6 +656,453 @@ else:
                 st.column_config.NumberColumn(
                     "Aircraft Hours",
                     format="%.1f",
+                ),
+        },
+    )
+# --------------------------------------------------
+# Fleet scenario comparison
+# --------------------------------------------------
+
+st.subheader("Fleet Scenario Comparison")
+
+st.write(
+    """
+    Compare alternative fleet sizes to understand
+    how additional aircraft capacity changes the
+    optimized Aerofrite network.
+    """
+)
+
+scenario_fleet_sizes = [
+    4,
+    5,
+    6,
+]
+
+scenario_summary, scenario_results = (
+    compare_fleet_scenarios(
+        scenario_fleet_sizes
+    )
+)
+
+
+# --------------------------------------------------
+# Scenario summary table
+# --------------------------------------------------
+
+st.markdown(
+    "**Scenario Summary**"
+)
+
+scenario_display = (
+    scenario_summary.copy()
+)
+
+st.dataframe(
+    scenario_display,
+    use_container_width=True,
+    hide_index=True,
+    column_config={
+        "Fleet Size":
+            st.column_config.NumberColumn(
+                "Fleet Size",
+                format="%d",
+            ),
+        "Destinations":
+            st.column_config.NumberColumn(
+                "Destinations",
+                format="%d",
+            ),
+        "Passengers":
+            st.column_config.NumberColumn(
+                "Passengers",
+                format="%d",
+            ),
+        "Revenue (€)":
+            st.column_config.NumberColumn(
+                "Revenue (€)",
+                format="localized",
+            ),
+        "Cost (€)":
+            st.column_config.NumberColumn(
+                "Cost (€)",
+                format="localized",
+            ),
+        "Contribution (€)":
+            st.column_config.NumberColumn(
+                "Contribution (€)",
+                format="localized",
+            ),
+        "Aircraft Hours":
+            st.column_config.NumberColumn(
+                "Aircraft Hours",
+                format="%.1f",
+            ),
+        "Available Hours":
+            st.column_config.NumberColumn(
+                "Available Hours",
+                format="%.1f",
+            ),
+        "Utilization":
+            st.column_config.NumberColumn(
+                "Utilization",
+                format="%.1f%%",
+            ),
+        "Incremental Contribution (€)":
+            st.column_config.NumberColumn(
+                "Incremental Contribution (€)",
+                format="localized",
+            ),
+        "Incremental Passengers":
+            st.column_config.NumberColumn(
+                "Incremental Passengers",
+                format="%.0f",
+            ),
+        "Incremental Destinations":
+            st.column_config.NumberColumn(
+                "Incremental Destinations",
+                format="%.0f",
+            ),
+    },
+)
+
+# --------------------------------------------------
+# Fleet expansion analysis
+# --------------------------------------------------
+
+st.markdown(
+    "**Fleet Expansion Value**"
+)
+
+chart_col1, chart_col2 = st.columns(2)
+
+
+# --------------------------------------------------
+# Contribution by fleet size
+# --------------------------------------------------
+
+with chart_col1:
+
+    st.markdown(
+        "##### Modeled Weekly Contribution"
+    )
+
+    contribution_chart = (
+        scenario_summary[
+            [
+                "Fleet Size",
+                "Contribution (€)",
+            ]
+        ]
+        .set_index("Fleet Size")
+    )
+
+    st.bar_chart(
+        contribution_chart
+    )
+
+
+# --------------------------------------------------
+# Passengers by fleet size
+# --------------------------------------------------
+
+with chart_col2:
+
+    st.markdown(
+        "##### Modeled Weekly Passengers"
+    )
+
+    passenger_chart = (
+        scenario_summary[
+            [
+                "Fleet Size",
+                "Passengers",
+            ]
+        ]
+        .set_index("Fleet Size")
+    )
+
+    st.bar_chart(
+        passenger_chart
+    )
+
+# --------------------------------------------------
+# Incremental aircraft value
+# --------------------------------------------------
+
+st.markdown(
+    "**Incremental Value of Additional Aircraft**"
+)
+
+incremental_rows = (
+    scenario_summary[
+        scenario_summary[
+            "Incremental Contribution (€)"
+        ].notna()
+    ]
+)
+
+incremental_cols = st.columns(
+    len(incremental_rows)
+)
+
+for column, (_, row) in zip(
+    incremental_cols,
+    incremental_rows.iterrows(),
+):
+
+    fleet_size_value = int(
+        row["Fleet Size"]
+    )
+
+    previous_fleet_size = (
+        fleet_size_value - 1
+    )
+
+    with column:
+
+        st.markdown(
+            f"##### "
+            f"{previous_fleet_size} → "
+            f"{fleet_size_value} Aircraft"
+        )
+
+        st.metric(
+            "Additional Contribution",
+            (
+                f"€"
+                f"{row['Incremental Contribution (€)']:,.0f}"
+            ),
+        )
+
+        st.metric(
+            "Additional Passengers",
+            (
+                f"+"
+                f"{row['Incremental Passengers']:,.0f}"
+            ),
+        )
+
+        st.metric(
+            "Additional Destinations",
+            (
+                f"+"
+                f"{row['Incremental Destinations']:,.0f}"
+            ),
+        )
+
+        st.metric(
+            "Contribution / Added Hour",
+            (
+                f"€"
+                f"{row['Incremental Contribution / Hour (€)']:,.0f}"
+            ),
+        )
+
+st.caption(
+    """
+    Incremental values compare adjacent optimized fleet scenarios.
+    Lower marginal contribution at higher fleet sizes can indicate
+    diminishing value from additional modeled capacity.
+    """
+)
+
+# --------------------------------------------------
+# Choose two scenarios to compare
+# --------------------------------------------------
+
+st.markdown(
+    "**Compare Two Fleet Plans**"
+)
+
+scenario_col1, scenario_col2 = (
+    st.columns(2)
+)
+
+with scenario_col1:
+
+    baseline_fleet = st.selectbox(
+        "Baseline fleet",
+        options=scenario_fleet_sizes,
+        index=1,
+        key="baseline_fleet",
+    )
+
+with scenario_col2:
+
+    alternative_fleet = st.selectbox(
+        "Alternative fleet",
+        options=scenario_fleet_sizes,
+        index=2,
+        key="alternative_fleet",
+    )
+
+
+# --------------------------------------------------
+# Pull summary rows
+# --------------------------------------------------
+
+baseline_summary = (
+    scenario_summary[
+        scenario_summary["Fleet Size"]
+        == baseline_fleet
+    ]
+    .iloc[0]
+)
+
+alternative_summary = (
+    scenario_summary[
+        scenario_summary["Fleet Size"]
+        == alternative_fleet
+    ]
+    .iloc[0]
+)
+
+
+# --------------------------------------------------
+# Calculate changes
+# --------------------------------------------------
+
+contribution_change = (
+    alternative_summary[
+        "Contribution (€)"
+    ]
+    - baseline_summary[
+        "Contribution (€)"
+    ]
+)
+
+passenger_change = (
+    alternative_summary[
+        "Passengers"
+    ]
+    - baseline_summary[
+        "Passengers"
+    ]
+)
+
+destination_change = (
+    alternative_summary[
+        "Destinations"
+    ]
+    - baseline_summary[
+        "Destinations"
+    ]
+)
+
+aircraft_hour_change = (
+    alternative_summary[
+        "Aircraft Hours"
+    ]
+    - baseline_summary[
+        "Aircraft Hours"
+    ]
+)
+
+
+# --------------------------------------------------
+# Incremental value metrics
+# --------------------------------------------------
+
+st.markdown(
+    f"**Modeled Impact: {baseline_fleet} → "
+    f"{alternative_fleet} Aircraft**"
+)
+
+impact_col1, impact_col2, (
+    impact_col3
+), impact_col4 = st.columns(4)
+
+contribution_change_display = (
+    f"+€{contribution_change:,.0f}"
+    if contribution_change > 0
+    else (
+        f"-€{abs(contribution_change):,.0f}"
+        if contribution_change < 0
+        else "€0"
+    )
+)
+
+impact_col1.metric(
+    "Contribution Change",
+    contribution_change_display,
+)
+
+impact_col2.metric(
+    "Passenger Change",
+    f"{passenger_change:+,.0f}",
+)
+
+impact_col3.metric(
+    "Destination Change",
+    f"{destination_change:+,.0f}",
+)
+
+impact_col4.metric(
+    "Aircraft Hours Change",
+    f"{aircraft_hour_change:+.1f}",
+)
+
+
+# --------------------------------------------------
+# Network changes
+# --------------------------------------------------
+
+st.markdown(
+    "**Network Changes**"
+)
+
+network_changes = compare_networks(
+    scenario_results[
+        baseline_fleet
+    ],
+    scenario_results[
+        alternative_fleet
+    ],
+)
+
+if network_changes.empty:
+
+    st.info(
+        "The selected scenarios produce "
+        "the same route frequencies."
+    )
+
+else:
+
+    st.dataframe(
+        network_changes,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Route":
+                st.column_config.TextColumn(
+                    "Route",
+                ),
+            "Frequency A":
+                st.column_config.NumberColumn(
+                    (
+                        f"{baseline_fleet} "
+                        "Aircraft"
+                    ),
+                    format="%d",
+                ),
+            "Frequency B":
+                st.column_config.NumberColumn(
+                    (
+                        f"{alternative_fleet} "
+                        "Aircraft"
+                    ),
+                    format="%d",
+                ),
+            "Frequency Change":
+                st.column_config.NumberColumn(
+                    "Change",
+                    format="%+d",
+                ),
+            "Change Type":
+                st.column_config.TextColumn(
+                    "Change Type",
                 ),
         },
     )
