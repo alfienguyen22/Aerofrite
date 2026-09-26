@@ -1,5 +1,6 @@
 import pandas as pd
 import streamlit as st
+from src.case_study import build_case_study
 
 from src.economics import calculate_route_economics
 from src.optimizer import optimize_network
@@ -522,3 +523,18 @@ def get_reserve_breakpoint_analysis(
             step_percent
         ),
     )
+
+# --------------------------------------------------
+# Cached case study
+# --------------------------------------------------
+
+@st.cache_data(
+    show_spinner=False
+)
+def get_case_study():
+    """
+    Build and cache Aerofrite's fixed portfolio
+    case-study scenario.
+    """
+
+    return build_case_study()
