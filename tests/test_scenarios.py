@@ -1,4 +1,5 @@
 from src.scenarios import (
+    analyze_reserve_breakpoints,
     compare_fleet_scenarios,
     compare_networks,
     compare_season_scenarios,
@@ -197,5 +198,64 @@ def test_season_scenarios_respect_capacity():
         assert (
             row["Aircraft Hours"]
             <= row["Available Hours"]
+            + 0.01
+        )
+
+def test_reserve_breakpoints_start_at_zero():
+
+    breakpoints, _ = (
+        analyze_reserve_breakpoints(
+            fleet_size=5,
+            season="shoulder",
+            max_buffer_percent=10,
+        )
+    )
+
+    assert (
+        breakpoints.iloc[0][
+            "Reserve (%)"
+        ]
+        == 0
+    )
+
+
+def test_reserve_breakpoints_are_ordered():
+
+    breakpoints, _ = (
+        analyze_reserve_breakpoints(
+            fleet_size=5,
+            season="shoulder",
+            max_buffer_percent=10,
+        )
+    )
+
+    reserves = breakpoints[
+        "Reserve (%)"
+    ].tolist()
+
+    assert reserves == sorted(
+        reserves
+    )
+
+
+def test_reserve_breakpoints_respect_capacity():
+
+    _, results = (
+        analyze_reserve_breakpoints(
+            fleet_size=5,
+            season="shoulder",
+            max_buffer_percent=10,
+        )
+    )
+
+    for result in results.values():
+
+        assert (
+            result[
+                "total_aircraft_hours"
+            ]
+            <= result[
+                "available_aircraft_hours"
+            ]
             + 0.01
         )

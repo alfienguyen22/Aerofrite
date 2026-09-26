@@ -1,6 +1,7 @@
 import pandas as pd
 import streamlit as st
 from src.scenarios import (
+    analyze_reserve_breakpoints,
     compare_fleet_scenarios,
     compare_networks,
     compare_season_scenarios,
@@ -1466,6 +1467,150 @@ st.caption(
     """
 )
 
+st.markdown(
+    "**Network Capacity Breakpoints**"
+)
+
+reserve_breakpoints, _ = (
+    analyze_reserve_breakpoints(
+        fleet_size=fleet_size,
+        season=season,
+        min_buffer_percent=0,
+        max_buffer_percent=25,
+        step_percent=1,
+    )
+)
+
+st.write(
+    """
+    A breakpoint occurs when reducing planning
+    capacity forces Aerofrite to change at least
+    one route frequency or remove a route.
+    """
+)
+
+with st.expander(
+    "View detailed network capacity breakpoints"
+):
+
+    st.dataframe(
+        reserve_breakpoints,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Reserve (%)":
+                st.column_config.NumberColumn(
+                    format="%d%%",
+                ),
+
+            "Planning Capacity (h)":
+                st.column_config.NumberColumn(
+                    format="%.1f",
+                ),
+
+            "Scheduled Hours":
+                st.column_config.NumberColumn(
+                    format="%.1f",
+                ),
+
+            "Destinations":
+                st.column_config.NumberColumn(
+                    format="%d",
+                ),
+
+            "Passengers":
+                st.column_config.NumberColumn(
+                    format="%d",
+                ),
+
+            "Contribution (€)":
+                st.column_config.NumberColumn(
+                    format="localized",
+                ),
+
+            "Changed Routes":
+                st.column_config.NumberColumn(
+                    format="%d",
+                ),
+
+            "Changes from Previous Breakpoint":
+                st.column_config.TextColumn(),
+        },
+    )
+
+current_breakpoints = (
+    reserve_breakpoints[
+        reserve_breakpoints[
+            "Reserve (%)"
+        ]
+        <= operational_buffer_percent
+    ]
+)
+
+if not current_breakpoints.empty:
+
+    current_regime = (
+        current_breakpoints.iloc[-1]
+    )
+
+    regime_start = int(
+        current_regime[
+            "Reserve (%)"
+        ]
+    )
+
+    future_breakpoints = (
+        reserve_breakpoints[
+            reserve_breakpoints[
+                "Reserve (%)"
+            ]
+            > operational_buffer_percent
+        ]
+    )
+
+    st.info(
+        (
+            f"At {operational_buffer_percent}% "
+            f"reserve, the current network "
+            f"configuration first appears at "
+            f"{regime_start}% reserve."
+        )
+    )
+
+    if not future_breakpoints.empty:
+
+        next_breakpoint = int(
+            future_breakpoints.iloc[0][
+                "Reserve (%)"
+            ]
+        )
+
+        st.caption(
+            (
+                f"The next modeled network "
+                f"change occurs at "
+                f"{next_breakpoint}% reserve."
+            )
+        )
+
+    else:
+
+        st.caption(
+            """
+            No further network change occurs
+            within the analyzed 0–25% reserve range.
+            """
+        )
+
+st.caption(
+    """
+    Destination count does not necessarily decline at every
+    higher reserve level. Because route frequencies are
+    discrete, the optimizer may replace a higher-frequency
+    route with multiple lower-frequency services while total
+    planning capacity and modeled contribution decline.
+    """
+)
 # --------------------------------------------------
 # Seasonal network comparison
 # --------------------------------------------------

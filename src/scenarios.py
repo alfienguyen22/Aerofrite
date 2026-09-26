@@ -481,3 +481,208 @@ def compare_season_scenarios(
     )
 
     return summary, results
+
+def analyze_reserve_breakpoints(
+    fleet_size,
+    season="shoulder",
+    min_buffer_percent=0,
+    max_buffer_percent=25,
+    step_percent=1,
+):
+    """
+    Find operational-reserve levels where the
+    optimized network structure changes.
+
+    A breakpoint occurs when at least one route's
+    selected weekly frequency changes.
+
+    Parameters
+    ----------
+    fleet_size : int
+        Number of aircraft available.
+
+    season : str
+        Planning season.
+
+    min_buffer_percent : int
+        Lowest reserve percentage to evaluate.
+
+    max_buffer_percent : int
+        Highest reserve percentage to evaluate.
+
+    step_percent : int
+        Percentage-point interval between scenarios.
+
+    Returns
+    -------
+    breakpoints : pandas.DataFrame
+        Only reserve levels where the network changes.
+
+    results : dict
+        Optimizer results keyed by breakpoint
+        reserve percentage.
+    """
+
+    if (
+        not isinstance(fleet_size, int)
+        or fleet_size < 0
+    ):
+        raise ValueError(
+            "Fleet size must be a "
+            "non-negative integer."
+        )
+
+    if (
+        min_buffer_percent < 0
+        or max_buffer_percent >= 100
+        or min_buffer_percent
+        > max_buffer_percent
+    ):
+        raise ValueError(
+            "Invalid operational reserve range."
+        )
+
+    if step_percent <= 0:
+        raise ValueError(
+            "Reserve step must be positive."
+        )
+
+    breakpoint_rows = []
+    results = {}
+
+    previous_signature = None
+    previous_result = None
+
+    for buffer_percent in range(
+        min_buffer_percent,
+        max_buffer_percent + 1,
+        step_percent,
+    ):
+
+        buffer_value = (
+            buffer_percent / 100
+        )
+
+        result = optimize_network(
+            fleet_size_override=fleet_size,
+            season=season,
+            operational_buffer=buffer_value,
+            save_output=False,
+            print_results=False,
+        )
+
+        # Build a stable representation of
+        # every route and its chosen frequency.
+        network_signature = tuple(
+            result["routes"]
+            .sort_values("route_id")[
+                [
+                    "route_id",
+                    "frequency",
+                ]
+            ]
+            .itertuples(
+                index=False,
+                name=None,
+            )
+        )
+
+        # Skip reserve levels that produce
+        # exactly the same network.
+        if (
+            previous_signature is not None
+            and network_signature
+            == previous_signature
+        ):
+            continue
+
+        if previous_result is None:
+
+            changed_routes = 0
+            change_summary = (
+                "Baseline network"
+            )
+
+        else:
+
+            changes = compare_networks(
+                previous_result,
+                result,
+            )
+
+            changed_routes = len(
+                changes
+            )
+
+            change_parts = []
+
+            for _, row in (
+                changes.iterrows()
+            ):
+
+                change_parts.append(
+                    (
+                        f"{row['Route']} "
+                        f"{int(row['Frequency A'])}"
+                        f"→"
+                        f"{int(row['Frequency B'])}"
+                    )
+                )
+
+            change_summary = "; ".join(
+                change_parts
+            )
+
+        breakpoint_rows.append(
+            {
+                "Reserve (%)":
+                    buffer_percent,
+
+                "Planning Capacity (h)":
+                    result[
+                        "available_aircraft_hours"
+                    ],
+
+                "Scheduled Hours":
+                    result[
+                        "total_aircraft_hours"
+                    ],
+
+                "Destinations":
+                    result[
+                        "destinations_served"
+                    ],
+
+                "Passengers":
+                    result[
+                        "total_passengers"
+                    ],
+
+                "Contribution (€)":
+                    result[
+                        "total_contribution"
+                    ],
+
+                "Changed Routes":
+                    changed_routes,
+
+                "Changes from Previous Breakpoint":
+                    change_summary,
+            }
+        )
+
+        results[
+            buffer_percent
+        ] = result
+
+        previous_signature = (
+            network_signature
+        )
+
+        previous_result = result
+
+    breakpoints = pd.DataFrame(
+        breakpoint_rows
+    )
+
+    return breakpoints, results
