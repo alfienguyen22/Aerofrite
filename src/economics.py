@@ -4,6 +4,12 @@ from src.demand import (
     get_frequency_multiplier,
 )
 
+from src.market_adjustments import (
+    calculate_adjusted_market_demand,
+    get_competition_multiplier,
+    get_seasonality_multiplier,
+)
+
 
 # File paths
 ROUTES_PATH = "data/routes.csv"
@@ -45,6 +51,7 @@ def calculate_route_economics(
     route,
     frequency,
     seats,
+    season="shoulder",
 ):
     """
     Calculate the weekly economics of one route
@@ -69,6 +76,38 @@ def calculate_route_economics(
 
     market_type = route["market_type"]
 
+    # Older synthetic test routes may not include
+    # competition_level. Treat those as low competition
+    # so existing unit tests remain backwards-compatible.
+    competition_level = route.get(
+        "competition_level",
+        "low",
+    )
+
+    seasonality_multiplier = (
+        get_seasonality_multiplier(
+            market_type=market_type,
+            season=season,
+        )
+    )
+
+    competition_multiplier = (
+        get_competition_multiplier(
+            competition_level=competition_level,
+        )
+    )
+
+    adjusted_market_demand = (
+        calculate_adjusted_market_demand(
+            base_weekly_demand=route[
+                "weekly_demand"
+            ],
+            market_type=market_type,
+            competition_level=competition_level,
+            season=season,
+        )
+    )
+
     demand_multiplier = (
         get_frequency_multiplier(
             market_type=market_type,
@@ -87,6 +126,19 @@ def calculate_route_economics(
             "load_factor": 0.0,
             "demand_multiplier": 0.0,
             "effective_demand": 0,
+            "season": season,
+            "seasonality_multiplier": (
+                seasonality_multiplier
+            ),
+            "competition_level": (
+                competition_level
+            ),
+            "competition_multiplier": (
+                competition_multiplier
+            ),
+            "adjusted_market_demand": (
+                adjusted_market_demand
+            ),
             "revenue": 0.0,
             "variable_cost": 0.0,
             "fixed_route_cost": 0.0,
@@ -99,9 +151,9 @@ def calculate_route_economics(
     # Demand Aerofrite can capture at this frequency.
     effective_demand = (
         calculate_effective_demand(
-            base_weekly_demand=route[
-                "weekly_demand"
-            ],
+            base_weekly_demand=(
+                adjusted_market_demand
+            ),
             market_type=market_type,
             frequency=frequency,
         )
@@ -189,6 +241,19 @@ def calculate_route_economics(
         "effective_demand": int(
             effective_demand
         ),
+        "season": season,
+        "seasonality_multiplier": (
+            seasonality_multiplier
+        ),
+        "competition_level": (
+            competition_level
+        ),
+        "competition_multiplier": (
+            competition_multiplier
+        ),
+        "adjusted_market_demand": (
+            adjusted_market_demand
+        ),
         "revenue": round(
             revenue,
             2,
@@ -217,6 +282,7 @@ def calculate_route_economics(
             contribution_per_aircraft_hour,
             2,
         ),
+
     }
 
 

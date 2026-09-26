@@ -61,6 +61,21 @@ fleet_size = st.sidebar.slider(
     ),
 )
 
+season = st.sidebar.selectbox(
+    "Planning season",
+    options=[
+        "winter",
+        "shoulder",
+        "summer",
+    ],
+    index=1,
+    format_func=lambda value: value.title(),
+    help=(
+        "Season changes modeled market demand "
+        "by market type."
+    ),
+)
+
 
 # --------------------------------------------------
 # Run optimizer
@@ -68,6 +83,7 @@ fleet_size = st.sidebar.slider(
 
 result = optimize_network(
     fleet_size_override=fleet_size,
+    season=season,
     save_output=False,
     print_results=False,
 )
@@ -685,7 +701,8 @@ scenario_fleet_sizes = [
 
 scenario_summary, scenario_results = (
     compare_fleet_scenarios(
-        scenario_fleet_sizes
+        scenario_fleet_sizes,
+        season=season,
     )
 )
 

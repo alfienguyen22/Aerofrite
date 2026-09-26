@@ -223,6 +223,7 @@ def run_toy_optimizer():
 
 def optimize_network(
     fleet_size_override=None,
+    season="shoulder",
     save_output=True,
     print_results=True,
 ):
@@ -262,6 +263,18 @@ def optimize_network(
     aircraft = pd.read_csv(
         AIRCRAFT_PATH
     )
+
+    valid_seasons = {
+        "winter",
+        "shoulder",
+        "summer",
+    }
+
+    if season not in valid_seasons:
+
+        raise ValueError(
+            f"Unsupported season: {season}"
+        )
 
     # --------------------------------------------------
     # Load fleet assumptions
@@ -348,6 +361,7 @@ def optimize_network(
                     route=route,
                     frequency=frequency,
                     seats=seats,
+                    season=season,
                 )
             )
 
@@ -661,6 +675,7 @@ def optimize_network(
         "available_aircraft_hours": available_aircraft_hours,
         "fleet_utilization": fleet_utilization,
         "destinations_served": destinations_served,
+        "season": season,
     }
 
 

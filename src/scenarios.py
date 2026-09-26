@@ -3,7 +3,7 @@ import pandas as pd
 from src.optimizer import optimize_network
 
 
-def compare_fleet_scenarios(fleet_sizes):
+def compare_fleet_scenarios(fleet_sizes, season="shoulder",):
     """
     Run the Aerofrite optimizer for multiple fleet sizes.
 
@@ -49,6 +49,7 @@ def compare_fleet_scenarios(fleet_sizes):
 
         result = optimize_network(
             fleet_size_override=fleet_size,
+            season=season,
             save_output=False,
             print_results=False,
         )

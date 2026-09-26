@@ -11,6 +11,32 @@ market_assumptions = pd.read_csv(
     MARKET_ASSUMPTIONS_PATH
 )
 
+# --------------------------------------------------
+# Remove previously enriched market columns
+# --------------------------------------------------
+
+market_columns = [
+    "market_type",
+    "base_weekly_demand",
+    "fare_multiplier",
+    "airport_cost_tier",
+    "weekly_fixed_route_cost",
+    "competition_level",
+]
+
+existing_market_columns = [
+    column
+    for column in market_columns
+    if column in routes.columns
+]
+
+if existing_market_columns:
+
+    routes = routes.drop(
+        columns=existing_market_columns
+    )
+
+
 # Merge the dataset
 routes = routes.merge(market_assumptions, on="destination", how="left",)
 
